@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多轮对话助手</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+        .container{max-width:800px;margin:20px auto;padding:20px}
+        .title{text-align:center;margin-bottom:20px}
+        .api-box{margin-bottom:15px}
+        input,button,textarea{width:100%;padding:10px;margin:5px 0;border-radius:5px;border:1px solid #ccc}
+        button{background:#007bff;color:white;border:none;cursor:pointer}
+        button:disabled{background:#ccc}
+        .chat-box{height:400px;border:1px solid #ccc;border-radius:5px;padding:10px;overflow-y:auto;margin-bottom:10px}
+        .msg{margin:8px 0;padding:8px;border-radius:5px}
+        .user{background:#e3f2fd;text-align:right}
+        .bot{background:#f5f5f5;text-align:left}
+        .loading{color:#007bff;text-align:center}
+        .error{color:red;text-align:center}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="title">多轮对话助手</h2>
+        <div class="api-box">
+            <input type="password" id="apiKey" placeholder="请输入阿里云百炼API Key">
+        </div>
+        <div class="chat-box" id="chatBox"></div>
+        <textarea id="userInput" rows="3" placeholder="请输入问题..."></textarea>
+        <button onclick="sendMessage()">发送</button>
+        <button onclick="clearChat()">清空对话</button>
+    </div>
+
+    <script>
+        const BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+        const MODEL = "qwen3.6-plus";
+        let messages = [];
+
+        function addMessage(role, text) {
+            const box = document.getElementById("chatBox");
+            const div = document.createElement("div");
+            div.className = "msg " + role;
+            div.innerText = text;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function showLoading(show) {
+            const box = document.getElementById("chatBox");
+            const loading = document.getElementById("loading");
+            if (show) {
+                const div = document.createElement("div");
+                div.id = "loading";
+                div.className = "loading";
+                div.innerText = "思考中...";
+                box.appendChild(div);
+            } else if (loading) loading.remove();
+        }
+
+        async function sendMessage() {
+            const key = document.getElementById("apiKey").value.trim();
+            const input = document.getElementById("userInput").value.trim();
+            if (!key || !input) return alert("请填写API Key和问题");
+            
+            addMessage("user", input);
+            document.getElementById("userInput").value = "";
+            messages.push({role: "user", content: input});
+            showLoading(true);
+
+            try {
+                const res = await fetch(BASE_URL, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${key}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: MODEL,
+                        messages: messages
+                    })
+                });
+                const data = await res.json();
+                showLoading(false);
+                if (!res.ok) throw new Error(data.error?.message || "请求失败");
+                const reply = data.choices[0].message.content;
+                messages.push({role: "assistant", content: reply});
+                addMessage("bot", reply);
+            } catch (e) {
+                showLoading(false);
+                addMessage("bot", "错误：" + e.message);
+            }
+        }
+
+        function clearChat() {
+            document.getElementById("chatBox").innerHTML = "";
+            messages = [];
+        }
+    </script>
+</body>
+</html>
